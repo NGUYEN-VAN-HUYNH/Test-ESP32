@@ -1,7 +1,6 @@
 #include "esp_camera.h"
 #include <Arduino.h>
 #include <HardwareSerial.h>
-#include <base64.h>
 #include <Wire.h>
 #include <U8g2lib.h>
 #include <PCF8563.h>
@@ -350,9 +349,15 @@ String makePayload() { // Hàm chụp ảnh và tạo payload JSON
     }
   }
   Serial.printf(" Image captured, size: %d bytes\n", fb->len); // In kích thước ảnh
-  String base64Img = base64::encode(fb->buf, fb->len); // Mã hóa base64 ảnh
+  String hexImg; // Chuỗi HEX
+  const char hexChars[] = "0123456789ABCDEF"; // Bảng ký tự HEX
+  for (size_t j = 0; j < fb->len; j++) { // Chuyển từng byte sang HEX
+    uint8_t c = fb->buf[j]; // Lấy byte
+    hexImg += hexChars[c >> 4]; // Phần cao
+    hexImg += hexChars[c & 0xF]; // Phần thấp
+  }
   esp_camera_fb_return(fb); // Trả frame buffer
-  String json = "{\"image\":\"" + base64Img + "\"}"; // Tạo JSON với ảnh base64
+  String json = "{\"image\":\"" + hexImg + "\"}"; // Tạo JSON với ảnh hex
   return json; // Trả về JSON
 }
 long time_diff_seconds(Time t2, Time t1) {
@@ -364,7 +369,6 @@ long time_diff_seconds(Time t2, Time t1) {
 // ================== SETUP ==================
 String payload; // Biến lưu payload ảnh
 unsigned long afterPhotoTime = 0; // Biến lưu thời gian sau khi chụp ảnh
-
 void ButtonTask(void *pvParameters) {
   for (;;) {
     int buttonState = digitalRead(USER_BUTTON_PIN); // Đọc trạng thái nút
@@ -382,7 +386,6 @@ void ButtonTask(void *pvParameters) {
     vTaskDelay(pdMS_TO_TICKS(20)); // Chờ 20ms
   }
 }
-
 void MainTask(void *pvParameters) {
   camReady = false; // Reset cờ camera
   simReady = false; // Reset cờ SIM
@@ -468,7 +471,6 @@ void MainTask(void *pvParameters) {
     vTaskDelay(pdMS_TO_TICKS(20)); // Chờ 20ms mỗi loop
   }
 }
-
 void setup() { // Hàm setup chạy một lần khi khởi động
   esp_sleep_wakeup_cause_t wakeup_cause = esp_sleep_get_wakeup_cause();
   rtc.init();
@@ -527,7 +529,6 @@ void setup() { // Hàm setup chạy một lần khi khởi động
     xTaskCreate(MainTask, "MainTask", 8192, NULL, 1, NULL); // Ưu tiên thấp hơn
   }
 }
-
 void loop() {
   vTaskDelete(NULL); // Xóa task loop mặc định của Arduino
 }
